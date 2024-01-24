@@ -1,43 +1,35 @@
 import os
 import json
-
-import openai
-import pandas as pd
-from langchain_experimental.agents import create_pandas_dataframe_agent
 from langchain_openai import OpenAI
+from dotenv import load_dotenv, find_dotenv
 
+# Load environment variables
+_ = load_dotenv(find_dotenv())
 openai.api_key = os.environ['OPENAI_API_KEY']
-print("OPENAI API KEY LOADED")
 
+# Initialize OpenAI model
 LLM_MODEL = "gpt-3.5-turbo-instruct"
-
-def query_agent(data, query):
-    df = pd.read_json(data)
-    llm = OpenAI(model_name=LLM_MODEL)
-    agent = create_pandas_dataframe_agent(llm, df, verbose=True)
-    return agent.run(query)
+llm = OpenAI(model_name=LLM_MODEL)
 
 def lambda_handler(event, context):
-    # Check if 'body' is present (for API Gateway)
-    if 'body' in event:
-        data = json.loads(event['body'])
-    else:
-        # If 'body' is not present, assume the event is the data
-        data = event
+    # Extract the query from the Lambda event
+    query = event.get('query', '')
 
-    query = """
-    Based on the columns years, and price 
-    Estimate the price for the years 2024, 2025, 2026
-    And return it in JSON FORMAT with keys YEAR and price
-    """
+    # Check if the query is empty
+    if not query:
+        return {
+            'statusCode': 400,
+            'body': json.dumps({'error': 'Query parameter is missing'})
+        }
 
-    # Call the query_agent function with the provided data
-    answer = query_agent(json.dumps(data), query)
+    # Invoke the OpenAI model with the provided query
+    response = llm.invoke(query)
+
+    # Log the response (optional)
+    print(json.dumps(response))
 
     # Return the response
-    response = {
+    return {
         'statusCode': 200,
-        'body': json.dumps(answer)
+        'body': json.dumps(response)
     }
-
-    return response
